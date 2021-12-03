@@ -40,7 +40,7 @@ namespace Team.HobbyRobot.TDN.Core
             IEnumerable<string> rootPath = path.Take(path.Length - 1);
 
             Dictionary<string, TDNValue> currTable = rootData;
-            foreach (var rootName in rootPath)
+            foreach (string rootName in rootPath)
             {
                 if (createNewRoots && !currTable.ContainsKey(rootName))
                     currTable.Add(rootName, new TDNValue(new TDNRoot(), new TDNRootParser()));

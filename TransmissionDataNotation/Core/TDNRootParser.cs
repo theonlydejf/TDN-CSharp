@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Team.HobbyRobot.TDN.Core;
 
-namespace Team.HobbyRobot.TDN.Base
+namespace Team.HobbyRobot.TDN.Core
 {
     public class TDNRootParser : ITDNTypeParser
     {
