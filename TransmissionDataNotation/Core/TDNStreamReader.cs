@@ -11,7 +11,7 @@ namespace Team.HobbyRobot.TDN.Core
         public bool IsLastReadCharacterEscaped { get; private set; }
 
         private readonly StreamReader sr;
-        private List<char> charQueue = new List<char>();
+        private Queue<char> charQueue = new Queue<char>();
         public readonly TDNParserSettings settings;
 
         public TDNStreamReader(StreamReader streamReader) : this(streamReader, new DefaultTDNParserSettings()) { }
@@ -34,10 +34,7 @@ namespace Team.HobbyRobot.TDN.Core
         {
             int iChar = -1;
             if (charQueue.Count > 0)
-            {
-                iChar = charQueue[0];
-                charQueue.RemoveAt(0);
-            }
+                iChar = charQueue.Dequeue();
             else
                 iChar = sr.Read();
             
@@ -53,13 +50,13 @@ namespace Team.HobbyRobot.TDN.Core
                 LastReadControlCharacter = TDNControlCharacter.None;
                 return Read(false);
             }
-
-            LastReadControlCharacter = settings.GetCharacterType(c);
+            if(!IsLastReadCharacterEscaped)
+                LastReadControlCharacter = settings.GetCharacterType(c);
 
             return c;
         }
 
-        public void QueueCharacter(char c) => charQueue.Add(c);
+        public void QueueCharacter(char c) => charQueue.Enqueue(c);
 
         public string ReadUntilControlCharacter(TDNControlCharacter controlChar)
         {
