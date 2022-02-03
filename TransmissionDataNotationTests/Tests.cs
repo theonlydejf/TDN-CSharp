@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -11,31 +12,61 @@ namespace Team.HobbyRobot.TDNTests
 {
     public class Tests
     {
+        static NetworkStream ns;
         public static void Main(string[] args)
         {
-            IPHostEntry ipHost = Dns.GetHostEntry("localhost");
-            IPAddress ipAddr = ipHost.AddressList[0];
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddr, 11111);
-            Socket listener = new Socket(ipAddr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
+            IPAddress ipAddr = IPAddress.Parse("192.168.1.100");
+            IPEndPoint ep = new IPEndPoint(ipAddr, 2222);
+            Socket sender = new Socket(ipAddr.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             TDNParserSettings settings = new DefaultTDNParserSettings();
 
             try
             {
-                listener.Bind(localEndPoint);
-                listener.Listen(10);
-
                 while (true)
                 {
                     Console.WriteLine("Waiting connection ... ");
-                    Socket clientSocket = listener.Accept();
+                    sender.Connect(ep);
 
-                    NetworkStream ns = new NetworkStream(clientSocket);
+                    ns = new NetworkStream(sender);
                     StreamWriter sw = new StreamWriter(ns);
                     StreamReader sr = new StreamReader(ns);
-                    while(true)
+
+                    var timer = new System.Timers.Timer(9700);
+                    timer.Elapsed += Timer_Elapsed;
+                    timer.Start();
+
+                    TDNRoot _root = new TDNRoot();
+                    _root["service"] = (ConvertibleTDNValue)"MovementService";
+                    _root["request"] = (ConvertibleTDNValue)"travel";
+                    _root["params.distance"] = (ConvertibleTDNValue)300f;
+                    int parse = 0;
+                    int response = 0;
+                    int took = 0;
+                    long real = 0;
+                    Stopwatch stopwatch = new Stopwatch();
+                    if(false)
                     {
-                        TDNRoot root = TDNFactory.ReadRoot("root", new DefaultTDNParserSettings());
+                        for (int i = 0; i < 100; i++)
+                        {
+                            stopwatch.Restart();
+                            _root.WriteToStream(ns);
+                            var r = TDNRoot.ReadFromStream(ns);
+                            stopwatch.Stop();
+                            real += stopwatch.ElapsedMilliseconds;
+                            parse += (int)r["parseTook"].Value;
+                            took += (int)r["took"].Value;
+                            response += (int)r["responseTook"].Value;
+                            Console.WriteLine(i);
+                        }
+                    }
+                    Console.WriteLine("parse: " + parse / 100D);
+                    Console.WriteLine("response: " + response / 100D);
+                    Console.WriteLine("took: " + took / 100D);
+                    Console.WriteLine("real: " + real / 100D);
+
+                    while (true)
+                    {
+                        TDNRoot root = TDNFactory.ReadRoot("root", new DefaultTDNParserSettings(), _root);
                         root.WriteToStream(ns);
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("\n\nRecieved root:");
@@ -47,6 +78,17 @@ namespace Team.HobbyRobot.TDNTests
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
+            }
+        }
+
+        private static void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            TDNRoot heartbeat = new TDNRoot();
+            heartbeat["service"] = (ConvertibleTDNValue)"API";
+            heartbeat["request"] = (ConvertibleTDNValue)"Heartbeat";
+            lock(ns)
+            {
+                heartbeat.WriteToStream(ns);
             }
         }
     }
@@ -80,7 +122,7 @@ namespace Team.HobbyRobot.TDNTests
             }
             else if (typeKey == new TDNRootParser().TypeKey)
             {
-                return ReadRoot(valueKey, settings);
+                return ReadRoot(valueKey, settings, new TDNRoot());
             }
             else if (typeKey == new ArrayParser().TypeKey)
             {
@@ -95,9 +137,9 @@ namespace Team.HobbyRobot.TDNTests
             }
         }
 
-        public static TDNRoot ReadRoot(string rootKey, TDNParserSettings settings)
+        public static TDNRoot ReadRoot(string rootKey, TDNParserSettings settings, TDNRoot startRoot)
         {
-            TDNRoot root = new TDNRoot();
+            TDNRoot root = startRoot;
             while (true)
             {
                 //TODO vytvoreni
